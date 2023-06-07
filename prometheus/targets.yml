@@ -1,0 +1,4 @@
+- targets:
+    - 10.136.170.53:9100
+  labels:
+    job: 'dockerhost-nodes'

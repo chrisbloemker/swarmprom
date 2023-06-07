@@ -1,0 +1,52 @@
+#
+# Ansible managed: /Users/chris/git/teck/ansible-playbooks/roles/dockerhost-monitoring/templates/01-prod.rules.j2 modified on 2019-12-11 18:39:19 by chris on MH400015.chrispy.home
+#
+groups:
+- name: Production Alerts
+  rules:
+
+  # Alert for any.name that is unreachable for >1 minute(s).
+  - alert: service_down
+    expr: up{monitor!="false",job="dockerhost-prod"} == 0
+    for: 1m
+    labels:
+      severity: page
+    annotations:
+      summary: "Instance {{ $labels.instance }} down"
+      description: "[{{ $labels.product }}-{{ $labels.environment }}] {{ $labels.instance }} of {{ $labels.job }} has been down for more than 1 minute."
+
+  - alert: ProbeFailing
+    expr: up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Probe Failure {{ $labels.instance }}"
+      description: "{{ $labels.instance }} of {{ $labels.job }} has failed probing for more than 5 minutes. Try to `curl -v {{ $labels.instance }}` to see what type of response the server is returning. This can also be a DNS error with Cloudflare or other providers. Check CF's status here: https://www.cloudflarestatus.com/"
+
+  - alert: mySQL Query Count
+    expr: irate(mysql_global_status_questions[5m]) >= 150
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      summary: "mySQL question count warning -  {{ $labels.instance }}"
+      description: "{{ $labels.instance }} of {{ $labels.job }} mySQL query count has exceeded 150 queries for 2 minutes."
+
+  - alert: High mySQL Query Count
+    expr: irate(mysql_global_status_questions[5m]) >= 250
+    for: 10m
+    labels:
+      severity: moderate
+    annotations:
+      summary: "mySQL question count warning -  {{ $labels.instance }}"
+      description: "{{ $labels.instance }} - mySQL query count has exceeded 250 queries for 10 minutes. This is extremely rare and should be investigated immediately."
+
+  - alert: Low Disk Space
+    expr: (node_filesystem_avail_bytes* 100) / node_filesystem_size_bytes{mountpoint!~"/var/lib.*|/run.*"} < 10
+    for: 2m
+    labels:
+      severity: high
+    annotations:
+      summary: "{{ $labels.instance }} has less than 10% free disk space"
+      description: "Mountpoint {{ $labels.mountpoint }} of {{ $labels.instance }} has less than 10% free disk space. If untreated, instance might have docker engine crash!"

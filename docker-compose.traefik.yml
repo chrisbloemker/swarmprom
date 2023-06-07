@@ -58,14 +58,19 @@ services:
           memory: 64M
 
   grafana:
-    image: stefanprodan/swarmprom-grafana:5.3.4
+          #image: grafana/grafana:6.2.2
+          #image: grafana/grafana:7.3.7
+          #image: grafana/grafana:8.3.6
+          #image: grafana/grafana:9.0.3
+    image: grafana/grafana:9.2.15
     networks:
       - default
       - net
       - traefik-public
     environment:
-      - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_USER=chris
+      - GF_SECURITY_ADMIN_PASSWORD=106791992*
+      - GF_AUTH_BASIC_ENABLED=false
       - GF_USERS_ALLOW_SIGN_UP=false
       #- GF_SERVER_ROOT_URL=${GF_SERVER_ROOT_URL:-localhost}
       #- GF_SMTP_ENABLED=${GF_SMTP_ENABLED:-false}
@@ -88,7 +93,7 @@ services:
         reservations:
           memory: 64M
       labels:
-        - traefik.frontend.rule=Host:grafana.${DOMAIN}
+        - traefik.frontend.rule=Host:monitoring.dockerhost.io
         - traefik.enable=true
         - traefik.port=3000
         - traefik.tags=${TRAEFIK_PUBLIC_TAG:-traefik-public}
@@ -98,9 +103,12 @@ services:
         - traefik.redirectorservice.frontend.redirect.entryPoint=https
         # Traefik service that listens to HTTPS
         - traefik.webservice.frontend.entryPoints=https
+        - traefik.frontend.auth.basic.users=admin:$$2y$$05$$mqryMh42FiGOOTv4iUeQL.5WIIjR9/DnAJVFI2sRGEun1QuWj3IsG
 
   alertmanager:
-    image: stefanprodan/swarmprom-alertmanager:v0.14.0
+    image: prom/alertmanager:v0.17.0
+    ports:
+      - 9093:9093
     networks:
       - default
       - net
@@ -113,7 +121,8 @@ services:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
     volumes:
-      - alertmanager:/alertmanager
+      - ./alertmanager:/etc/alertmanager
+            #      - alertmanager:/alertmanager
     deploy:
       mode: replicated
       replicas: 1
@@ -126,7 +135,7 @@ services:
         reservations:
           memory: 64M
       labels:
-        - traefik.frontend.rule=Host:alertmanager.${DOMAIN}
+        - traefik.frontend.rule=Host:alerting.dockerhost.io
         - traefik.enable=true
         - traefik.port=9093
         - traefik.tags=${TRAEFIK_PUBLIC_TAG:-traefik-public}
@@ -136,7 +145,7 @@ services:
         - traefik.redirectorservice.frontend.redirect.entryPoint=https
         # Traefik service that listens to HTTPS
         - traefik.webservice.frontend.entryPoints=https
-        - traefik.frontend.auth.basic.users=${ADMIN_USER}:${HASHED_PASSWORD}
+        - traefik.frontend.auth.basic.users=admin:$$2y$$05$$mqryMh42FiGOOTv4iUeQL.5WIIjR9/DnAJVFI2sRGEun1QuWj3IsG
 
   unsee:
     image: cloudflare/unsee:v0.8.0
@@ -150,7 +159,7 @@ services:
       mode: replicated
       replicas: 1
       labels:
-        - traefik.frontend.rule=Host:unsee.${DOMAIN}
+        - traefik.frontend.rule=Host:unsee.dockerhost.io
         - traefik.enable=true
         - traefik.port=8080
         - traefik.tags=${TRAEFIK_PUBLIC_TAG:-traefik-public}
@@ -160,35 +169,12 @@ services:
         - traefik.redirectorservice.frontend.redirect.entryPoint=https
         # Traefik service that listens to HTTPS
         - traefik.webservice.frontend.entryPoints=https
-        - traefik.frontend.auth.basic.users=${ADMIN_USER}:${HASHED_PASSWORD}
-
-  node-exporter:
-    image: stefanprodan/swarmprom-node-exporter:v0.16.0
-    networks:
-      - net
-    environment:
-      - NODE_ID={{.Node.ID}}
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-      - /etc/hostname:/etc/nodename
-    command:
-      - '--path.sysfs=/host/sys'
-      - '--path.procfs=/host/proc'
-      - '--collector.textfile.directory=/etc/node-exporter/'
-      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-      - '--no-collector.ipvs'
-    deploy:
-      mode: global
-      resources:
-        limits:
-          memory: 128M
-        reservations:
-          memory: 64M
+        - traefik.frontend.auth.basic.users=admin:$$2y$$05$$mqryMh42FiGOOTv4iUeQL.5WIIjR9/DnAJVFI2sRGEun1QuWj3IsG
 
   prometheus:
-    image: stefanprodan/swarmprom-prometheus:v2.5.0
+    image: prom/prometheus:v2.9.2
+    ports:
+      - 9090:9090
     networks:
       - default
       - net
@@ -196,9 +182,11 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention=24h'
+      - '--storage.tsdb.retention=24000h'
+      - '--web.enable-lifecycle'
     volumes:
-      - prometheus:/prometheus
+      - ./prometheus:/etc/prometheus
+        #- prometheus:/prometheus
     configs:
       - source: node_rules
         target: /etc/prometheus/swarm_node.rules.yml
@@ -212,11 +200,11 @@ services:
           - node.role == manager
       resources:
         limits:
-          memory: 2048M
+          memory: 1024M
         reservations:
           memory: 128M
       labels:
-        - traefik.frontend.rule=Host:prometheus.${DOMAIN}
+        - traefik.frontend.rule=Host:metrics.dockerhost.io
         - traefik.enable=true
         - traefik.port=9090
         - traefik.tags=${TRAEFIK_PUBLIC_TAG:-traefik-public}
@@ -226,4 +214,69 @@ services:
         - traefik.redirectorservice.frontend.redirect.entryPoint=https
         # Traefik service that listens to HTTPS
         - traefik.webservice.frontend.entryPoints=https
-        - traefik.frontend.auth.basic.users=${ADMIN_USER}:${HASHED_PASSWORD}
+        - traefik.frontend.auth.basic.users=admin:$$2y$$05$$mqryMh42FiGOOTv4iUeQL.5WIIjR9/DnAJVFI2sRGEun1QuWj3IsG
+ 
+  blackbox_exporter:
+    image: prom/blackbox-exporter:v0.17.0
+    networks:
+      - net
+    command:
+      - '--config.file=/config.yml'
+    volumes:
+      - ./blackbox_exporter/config.yml:/config.yml
+    ports:
+      - 9115:9115
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M 
+      labels:
+        - traefik.frontend.rule=Host:blackbox.dockerhost.io
+        - traefik.enable=true
+        - traefik.port=9115
+        - traefik.tags=${TRAEFIK_PUBLIC_TAG:-traefik-public}
+        - traefik.docker.network=traefik-public
+        # Traefik service that listens to HTTP
+        - traefik.redirectorservice.frontend.entryPoints=http
+        - traefik.redirectorservice.frontend.redirect.entryPoint=https
+        # Traefik service that listens to HTTPS
+        - traefik.webservice.frontend.entryPoints=https
+        - traefik.frontend.auth.basic.users=admin:$$2y$$05$$mqryMh42FiGOOTv4iUeQL.5WIIjR9/DnAJVFI2sRGEun1QuWj3IsG
+
+  karma:
+    image: ghcr.io/prymitive/karma:v0.78
+    networks:
+      - net
+    environment:
+      - "ALERTMANAGER_URI=http://alertmanager:9093"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M 
+      labels:
+        - traefik.frontend.rule=Host:karma.dockerhost.io
+        - traefik.enable=true
+        - traefik.port=8080
+        - traefik.tags=${TRAEFIK_PUBLIC_TAG:-traefik-public}
+        - traefik.docker.network=traefik-public
+        # Traefik service that listens to HTTP
+        - traefik.redirectorservice.frontend.entryPoints=http
+        - traefik.redirectorservice.frontend.redirect.entryPoint=https
+        # Traefik service that listens to HTTPS
+        - traefik.webservice.frontend.entryPoints=https
+        - traefik.frontend.auth.basic.users=admin:$$2y$$05$$mqryMh42FiGOOTv4iUeQL.5WIIjR9/DnAJVFI2sRGEun1QuWj3IsG
+

@@ -1,0 +1,105 @@
+#
+# Ansible managed: /Users/chris/git/teck/ansible-playbooks/roles/dockerhost-monitoring/templates/alertmanager.yml.j2 modified on 2019-12-11 18:37:01 by chris on MH400015.chrispy.home
+#
+global:
+
+route:
+    receiver: 'slack'
+    repeat_interval: 4h
+    group_wait: 15s
+    group_interval: 30s
+    group_by: ['alertname', 'instance']
+
+    routes:
+
+    # Highest priority alerts - page
+    - match:
+          severity: page
+      receiver: 'all'
+      repeat_interval: 15m
+      group_wait: 30s
+      group_interval: 30s
+      group_by: ['alertname', 'instance']
+      continue: true
+
+    # High priority alerts
+    - match_re:
+          severity: critical|high
+      receiver: all
+      repeat_interval: 30m
+      group_wait: 15s
+      group_interval: 30s
+      group_by: ['alertname', 'instance']
+      continue: true
+
+    # Medium priority alerts
+    - match:
+          severity: moderate
+      receiver: 'slack-moderate'
+      repeat_interval: 4h
+      group_wait: 30s
+      group_interval: 1m
+      group_by: ['alertname', 'instance']
+      continue: true
+
+    # Low priority alerts
+    - match:
+          severity: warning
+      receiver: 'slack-low'
+      repeat_interval: 8h
+      group_wait: 5m
+      group_interval: 2m
+      group_by: ['alertname', 'instance']
+
+receivers:
+    - name: 'slack'
+      slack_configs:
+      - api_url: "https://hooks.slack.com/services/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"
+        channel: '#droplet_alerts'
+        send_resolved: true
+        title: '{{ template "custom_title" . }}'
+        text: '{{ template "custom_slack_message" . }}'
+
+    - name: 'slack-high'
+      slack_configs:
+      - api_url: "https://hooks.slack.com/services/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"
+        channel: '#alerts-high'
+        send_resolved: true
+        title: '{{ template "custom_title" . }}'
+        text: '{{ template "custom_slack_message" . }}'
+
+    - name: 'slack-low'
+      slack_configs:
+      - api_url: "https://hooks.slack.com/services/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"
+        channel: '#alerts-low'
+        send_resolved: true
+        title: '{{ template "custom_title" . }}'
+        text: '{{ template "custom_slack_message" . }}'
+
+    - name: 'slack-moderate'
+      slack_configs:
+      - api_url: "https://hooks.slack.com/services/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"
+        channel: '#alerts-moderate'
+        send_resolved: true
+        title: '{{ template "custom_title" . }}'
+        text: '{{ template "custom_slack_message" . }}'
+
+    - name: pushover
+      pushover_configs:
+        - token: a5v689xvnh2oheh2wcxaxfady5g4gp
+          user_key: uybcy14c2f9xpc3nshb4a4quyw9eui
+
+    - name: all
+      pushover_configs:
+        - token: a5v689xvnh2oheh2wcxaxfady5g4gp
+          user_key: uybcy14c2f9xpc3nshb4a4quyw9eui
+      slack_configs:
+      - api_url: "https://hooks.slack.com/services/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"
+        channel: '#alerts-high'
+        send_resolved: true
+        title: '{{ template "custom_title" . }}'
+        text: '{{ template "custom_slack_message" . }}'
+
+
+templates:
+    - '/etc/alertmanager/template/*.tmpl'

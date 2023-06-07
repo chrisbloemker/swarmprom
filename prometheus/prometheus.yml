@@ -1,0 +1,134 @@
+# Ansible Managed
+global:
+  scrape_interval:     60s
+  evaluation_interval: 30s
+  external_labels:
+      monitor: digital-ocean
+
+remote_write:
+- url: https://prometheus-us-central1.grafana.net/api/prom/push
+  basic_auth:
+    username: 52921
+    password: eyJrIjoiZDliMjcxMTFkMzhjMTk1ODBlNjc3Y2VkZDQ1MDg4MjZhM2U4MjM4MCIsIm4iOiJkb2NrZXJob3N0LW1vbml0b3JpbmctYXBwc2VydmVyIiwiaWQiOjQ2OTM3OX0=
+
+
+rule_files:
+        #  - 'alert.rules'
+  - '*.rules'
+
+alerting:
+  alertmanagers:
+  - scheme: http
+    static_configs:
+    - targets:
+      - "alertmanager:9093"
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+         - targets: ['localhost:9090']
+
+           
+  - job_name: 'ping'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    file_sd_configs:
+      - files: ['websites.yml']
+    scrape_interval:     2m
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      #replacement: 10.0.0.246:9115
+      replacement: blackbox_exporter:9115
+      #replacement: http://blackbox_exporter:9115 # The blackbox exporter.
+      #replacement: 127.0.0.1:9115 # The blackbox exporter.
+
+
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://chrisbloemker.win
+          #- https://qa.teckapps.com
+        - https://chrisbloemker.com
+        - https://www.astridmejiaabogados.com # direct
+        - https://suabogadalaboral.com # new astrid (redirect)
+        - https://teckdevelopment.com
+          #- https://clearbrowse.com
+       # k8s
+        - https://asesoria.guiajuridicaenpensiones.com
+        - https://bengalcatclub.com
+        - https://breeders.bengalcatclub.com
+        - https://dashreco.com
+        - https://diazassociates.co
+        - https://dockerhost.io
+        - https://fundacioninterjuris.com
+        - https://gastronomica.com.ve
+        - https://guiajuridicaenpensiones.com
+        - https://innerboosthealth.com
+        - https://interjuris.com
+        - https://interjurisacademy.com
+        - https://interjurisacelera.com
+        - https://kamedicalapparel.com
+        - https://miamidadealuminum.com
+        - https://pisosbytatz.com
+        - https://ruthteitelbaum.com
+        - https://suabogadalaboral.com
+        - https://sundhednatural.com
+
+
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      #replacement: 10.0.0.246:9115
+      replacement: blackbox_exporter:9115
+      #replacement: http://blackbox_exporter:9115 # The blackbox exporter.
+      #replacement: 127.0.0.1:9115 # The blackbox exporter.
+
+
+  - job_name: 'blackbox-cron-slo'
+    scrape_interval: 300s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://asesoria.guiajuridicaenpensiones.com/wp-cron.php?setcronjob
+        - https://sundhednatural.com/wp-cron.php?setcronjob
+        - https://bengalcatclub.com/wp-cron.php?setcronjob
+        - https://bravosmentalhealthcare.com/wp-cron.php?setcronjob
+        - https://breeders.bengalcatclub.com/wp-cron.php?setcronjob
+        - https://dashreco.com/wp-cron.php?setcronjob
+        - https://diazassociates.co/wp-cron.php?setcronjob
+        - https://dockerhost.io/wp-cron.php?setcronjob
+        - https://fundacioninterjuris.com/wp-cron.php?setcronjob
+        - https://gastronomica.com.ve/wp-cron.php?setcronjob
+        - https://guiajuridicaenpensiones.com/wp-cron.php?setcronjob
+        - https://customers.teckapps.com/api/v1/resources/books/all
+        - https://customers.teckapps.com/api/v1/resources/books
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      replacement: blackbox_exporter:9115
+
+
+  - job_name: 'dockerhost-prod'
+    file_sd_configs:
+      - files: ['targets.yml']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: 10.136.170.53:9100
+        replacement: dockerhost-monitoring-appserver-a-1
